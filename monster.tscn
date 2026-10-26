@@ -1,0 +1,25 @@
+[gd_scene format=3 uid="uid://cr4mxoncpe8r2"]
+
+[ext_resource type="Script" uid="uid://mmpxkh61lt87" path="res://monster.gd" id="1_ga5te"]
+[ext_resource type="AudioStream" uid="uid://ds28c5bb6jv7w" path="res://sounds/monsterStep.ogg" id="2_vr0w3"]
+[ext_resource type="AudioStream" uid="uid://oqtg0noum4u" path="res://sounds/growl.mp3" id="3_6tndq"]
+[ext_resource type="AudioStream" uid="uid://br73bfi4b317j" path="res://sounds/scare.mp3" id="4_vr0w3"]
+[ext_resource type="AudioStream" uid="uid://cutkmqh832kmf" path="res://sounds/jumpscare.mp3" id="5_6tndq"]
+
+[node name="Monster" type="CharacterBody3D" unique_id=345934587]
+script = ExtResource("1_ga5te")
+
+[node name="Step" type="AudioStreamPlayer3D" parent="." unique_id=1688810271]
+stream = ExtResource("2_vr0w3")
+
+[node name="Growl" type="AudioStreamPlayer3D" parent="." unique_id=753245718]
+stream = ExtResource("3_6tndq")
+
+[node name="Scare" type="AudioStreamPlayer3D" parent="." unique_id=118755487]
+stream = ExtResource("4_vr0w3")
+volume_db = 35.822
+
+[node name="Jumpscare" type="AudioStreamPlayer" parent="." unique_id=576370226]
+stream = ExtResource("5_6tndq")
+volume_db = 24.0
+pitch_scale = 2.51

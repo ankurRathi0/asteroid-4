@@ -1,0 +1,23 @@
+[gd_scene format=3 uid="uid://cdg8ayww7wfdv"]
+
+[ext_resource type="Script" uid="uid://c4thct2h0jd7m" path="res://player.gd" id="1_4flbx"]
+[ext_resource type="AudioStream" uid="uid://d24r4af248mfu" path="res://sounds/step.ogg" id="2_i3pqv"]
+[ext_resource type="AudioStream" uid="uid://b5hqiexq8yasl" path="res://sounds/jump.ogg" id="3_hqtel"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_4kxuq"]
+
+[node name="player" type="CharacterBody3D" unique_id=761661415]
+script = ExtResource("1_4flbx")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=701689807]
+shape = SubResource("CapsuleShape3D_4kxuq")
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=2111546695]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
+
+[node name="Step" type="AudioStreamPlayer" parent="." unique_id=1391522223]
+stream = ExtResource("2_i3pqv")
+
+[node name="Jump" type="AudioStreamPlayer" parent="." unique_id=2049142791]
+stream = ExtResource("3_hqtel")
+volume_db = 6.597

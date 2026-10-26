@@ -1,0 +1,25 @@
+[gd_scene format=3 uid="uid://bq85jttbkajl7"]
+
+[ext_resource type="Script" uid="uid://b2eqiuvuo1ouo" path="res://main.gd" id="1_0xm2m"]
+[ext_resource type="PackedScene" uid="uid://cdg8ayww7wfdv" path="res://player.tscn" id="2_h2yge"]
+
+[sub_resource type="Environment" id="Environment_4kxuq"]
+background_mode = 1
+background_color = Color(0.72156864, 0.65882355, 0.3137255, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.72156864, 0.65882355, 0.3137255, 1)
+ambient_light_energy = 0.3
+fog_enabled = true
+fog_light_color = Color(0.5411765, 0.4862745, 0.23529412, 1)
+fog_density = 0.04
+
+[node name="Main" type="Node3D" unique_id=1641068371]
+script = ExtResource("1_0xm2m")
+
+[node name="Player" parent="." unique_id=761661415 instance=ExtResource("2_h2yge")]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=68631315]
+light_energy = 0.0
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=933271536]
+environment = SubResource("Environment_4kxuq")
