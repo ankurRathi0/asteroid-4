@@ -8,17 +8,20 @@ var scores_page
 var continue_btn
 var score_grid
 var empty_label
+var title
 
 func _ready():
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	var bg = ColorRect.new()
-	bg.color = Color(0.1, 0.09, 0.03)
+	bg.color = Color(0.03, 0.026, 0.012)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
 	var box = make_page("The Chase")
 	main_page = box.get_parent()
+	title = box.get_child(0)
+	title.add_theme_color_override("font_color", Color(0.86, 0.78, 0.48))
 	add_button(box, "Play", on_play)
 	add_button(box, "New Game", on_new)
 	continue_btn = add_button(box, "Continue", on_continue)
@@ -43,6 +46,12 @@ func _ready():
 	ob.item_selected.connect(on_diff)
 	sbox.add_child(ob)
 	add_label(sbox, "Hearts: Easy 5 / Medium 3 / Hard 2")
+	var gfx = CheckButton.new()
+	gfx.text = "High quality graphics"
+	gfx.button_pressed = Game.high_gfx
+	gfx.add_theme_font_size_override("font_size", 22)
+	gfx.toggled.connect(on_gfx)
+	sbox.add_child(gfx)
 	add_button(sbox, "Back", on_back)
 
 	var scbox = make_page("SCOREBOARD")
@@ -159,6 +168,15 @@ func on_sens(v):
 
 func on_diff(i):
 	Game.pref_diff = i
+
+func on_gfx(on):
+	Game.high_gfx = on
+
+func _process(_delta):
+	if randf() < 0.04:
+		title.modulate.a = randf_range(0.15, 0.7)
+	else:
+		title.modulate.a = 1.0
 
 func start():
 	get_tree().change_scene_to_file("res://main.tscn")

@@ -26,6 +26,8 @@ var path_timer = 0.0
 var waypoint = Vector3.ZERO
 var puffs = []
 var t_anim = 0.0
+var head_pivot
+var twitch = 0.0
 
 func _ready():
 	world = get_parent()
@@ -80,7 +82,15 @@ func build_body():
 	glow.albedo_color = Color(1, 1, 1)
 	glow.emission_enabled = true
 	glow.emission = Color(1, 1, 1)
-	glow.emission_energy_multiplier = 2.5
+	glow.emission_energy_multiplier = 6.0
+	var solid = StandardMaterial3D.new()
+	solid.albedo_color = Color(0, 0, 0)
+
+	var sc = CapsuleMesh.new()
+	sc.radius = 0.28
+	sc.height = 2.1
+	var caster = add_part(self, sc, Vector3(0, 1.05, 0), solid)
+	caster.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 
 	for i in 12:
 		var r = lerpf(0.4, 0.2, float(i) / 11.0)
@@ -96,6 +106,7 @@ func build_body():
 	head_node.position = Vector3(0, 1.95, 0)
 	head_node.rotation.z = 0.2
 	add_child(head_node)
+	head_pivot = head_node
 	var head = SphereMesh.new()
 	head.radius = 0.17
 	head.height = 0.5
@@ -123,6 +134,10 @@ func build_body():
 
 func _process(delta):
 	t_anim += delta
+	twitch -= delta
+	if twitch <= 0:
+		twitch = randf_range(0.08, 1.6)
+		head_pivot.rotation = Vector3(randf_range(-0.25, 0.25), randf_range(-0.5, 0.5), 0.2 + randf_range(-0.6, 0.6))
 	for p in puffs:
 		var a = t_anim * 1.5 + p["ph"]
 		p["n"].position = p["base"] + Vector3(sin(a), sin(a * 1.3) * 0.6, cos(a * 0.9)) * p["amp"]

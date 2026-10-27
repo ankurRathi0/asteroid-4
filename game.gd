@@ -18,6 +18,7 @@ var diff = 1
 var pref_diff = 1
 var volume = 1.0
 var sens = 1.0
+var high_gfx = true
 
 func _ready():
 	var cf = ConfigFile.new()
@@ -25,8 +26,14 @@ func _ready():
 		volume = cf.get_value("settings", "volume", 1.0)
 		sens = cf.get_value("settings", "sens", 1.0)
 		pref_diff = cf.get_value("settings", "diff", 1)
+		high_gfx = cf.get_value("settings", "gfx", true)
 	diff = pref_diff
 	hearts = HEARTS[diff]
+	var rv = AudioEffectReverb.new()
+	rv.room_size = 0.55
+	rv.damping = 0.6
+	rv.wet = 0.18
+	AudioServer.add_bus_effect(0, rv)
 	apply_settings()
 
 func start_new():
@@ -43,6 +50,7 @@ func save_settings():
 	cf.set_value("settings", "volume", volume)
 	cf.set_value("settings", "sens", sens)
 	cf.set_value("settings", "diff", pref_diff)
+	cf.set_value("settings", "gfx", high_gfx)
 	cf.save(PATH)
 
 func has_run():

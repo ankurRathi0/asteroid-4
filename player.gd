@@ -22,6 +22,10 @@ var look_id = -1
 var joy_base = Vector2.ZERO
 var held = {}
 var buttons = []
+var flash
+var bob = 0.0
+var bob_amp = 0.0
+var breath = 0.0
 
 func _ready():
 	touch = FORCE_TOUCH or OS.has_feature("mobile")
@@ -34,14 +38,29 @@ func _ready():
 	add_key("run", KEY_SHIFT)
 	add_key("jump", KEY_SPACE)
 	add_key("interact", KEY_E)
+	add_key("flashlight", KEY_F)
 	var click = InputEventMouseButton.new()
 	click.button_index = MOUSE_BUTTON_LEFT
 	if not InputMap.has_action("fire"):
 		InputMap.add_action("fire")
 	InputMap.action_add_event("fire", click)
 	make_bar()
+	make_flashlight()
 	if touch:
 		make_touch_ui()
+
+func make_flashlight():
+	flash = SpotLight3D.new()
+	flash.spot_range = 20.0
+	flash.spot_angle = 26.0
+	flash.spot_attenuation = 1.2
+	flash.spot_angle_attenuation = 0.6
+	flash.light_energy = 3.0
+	flash.light_color = Color(1.0, 0.93, 0.8)
+	flash.shadow_enabled = true
+	flash.position = Vector3(0.15, -0.1, 0)
+	flash.visible = false
+	$Camera3D.add_child(flash)
 
 func make_bar():
 	var layer = CanvasLayer.new()
@@ -70,6 +89,7 @@ func layout():
 	buttons = [
 		{"name": "JUMP", "action": "jump", "pos": Vector2(s.x - 130, s.y - 150), "r": 75.0},
 		{"name": "RUN", "action": "run", "pos": Vector2(s.x - 330, s.y - 110), "r": 65.0},
+		{"name": "LIGHT", "action": "flashlight", "pos": Vector2(s.x - 130, s.y - 330), "r": 55.0},
 	]
 func draw_touch():
 	layout()
@@ -94,6 +114,10 @@ func add_key(action, key):
 func _process(_delta):
 	if touch:
 		overlay.queue_redraw()
+	if flash.visible:
+		var m = get_parent().monster
+		var near = m != null and m.global_position.distance_to(global_position) < 12.0
+		flash.light_energy = randf_range(0.0, 1.5) if near and randf() < 0.2 else 3.0
 
 func _physics_process(delta):
 	if not is_on_floor():
@@ -101,6 +125,8 @@ func _physics_process(delta):
 	elif Input.is_action_just_pressed("jump"):
 		velocity.y = JUMP_VELOCITY
 		$Jump.play()
+	if Input.is_action_just_pressed("flashlight"):
+		flash.visible = not flash.visible
 
 	var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	if move_vec.length() > 0.15:
@@ -133,6 +159,16 @@ func _physics_process(delta):
 			step_timer = 0.3 if running else 0.5
 	else:
 		step_timer = 0.0
+
+	var hv = Vector2(velocity.x, velocity.z).length()
+	if moving:
+		bob += delta * hv * 1.4
+	bob_amp = lerpf(bob_amp, minf(hv / WALK_SPEED, 2.0) if moving else 0.0, delta * 8.0)
+	breath += delta * (2.6 if tired else 1.2)
+	var cam = $Camera3D
+	cam.position.y = 0.7 + sin(bob * 2.0) * 0.04 * bob_amp + sin(breath) * (0.025 if tired else 0.008)
+	cam.position.x = cos(bob) * 0.03 * bob_amp
+	cam.fov = lerpf(cam.fov, 82.0 if running else 75.0, delta * 4.0)
 
 func rotate_view(rel):
 	rotate_y(-rel.x)

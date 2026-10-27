@@ -18,17 +18,47 @@ var score = 0
 var hearts = 3
 var play_time = 0.0
 var dead = false
+var fear = 0.0
+var postfx
+var beat
+var beat_timer = 0.0
+var hum
+var hum_pb
+var hum_phase = 0.0
+var phantom
+var phantom_timer = 30.0
+var phantom_steps = 0
+var phantom_step_t = 0.0
+var shadow_timer = 0.0
 var unit_box = BoxMesh.new()
-var wall_mat = make_mat("res://textures/wall.jpg")
-var floor_mat = make_mat("res://textures/floor.jpg")
-var ceil_mat = make_mat("res://textures/ceiling.jpg")
+var fixture_box = make_box(Vector3(1.2, 0.04, 0.6))
+var wall_mat = make_mat("wall", 0.85, Color(0.92, 0.86, 0.7))
+var floor_mat = make_mat("floor", 1.0, Color(0.78, 0.72, 0.52))
+var ceil_mat = make_mat("ceiling", 0.95, Color(0.72, 0.7, 0.6))
+var trim_mat = make_trim()
 
-func make_mat(path):
+func make_box(sz):
+	var b = BoxMesh.new()
+	b.size = sz
+	return b
+
+func make_mat(tex, rough, tint):
 	var m = StandardMaterial3D.new()
-	m.albedo_texture = load(path)
+	m.albedo_texture = load("res://textures/%s.jpg" % tex)
+	m.albedo_color = tint
+	m.normal_enabled = true
+	m.normal_texture = load("res://textures/%s_n.png" % tex)
+	m.normal_scale = 0.8
+	m.roughness = rough
 	m.uv1_triplanar = true
 	m.uv1_world_triplanar = true
 	m.uv1_scale = Vector3(0.4, 0.4, 0.4)
+	return m
+
+func make_trim():
+	var m = StandardMaterial3D.new()
+	m.albedo_color = Color(0.22, 0.18, 0.1)
+	m.roughness = 0.6
 	return m
 
 func _ready():
@@ -44,14 +74,71 @@ func _ready():
 	else:
 		world_seed = randi() % 100000
 	hearts = Game.hearts
+	var env = $WorldEnvironment.environment
+	env.volumetric_fog_enabled = Game.high_gfx
+	env.ssao_enabled = Game.high_gfx
 	player.position = start
 	var pc = Vector2i(floori((start.x / TILE + 0.5) / CS), floori((start.z / TILE + 0.5) / CS))
 	for cx in range(pc.x - RADIUS, pc.x + RADIUS + 1):
 		for cy in range(pc.y - RADIUS, pc.y + RADIUS + 1):
 			load_chunk(Vector2i(cx, cy))
+	make_postfx()
 	make_hud()
+	make_audio()
 	spawn_monster()
 	spawn_pickup()
+
+func make_postfx():
+	var layer = CanvasLayer.new()
+	layer.layer = -1
+	add_child(layer)
+	postfx = ColorRect.new()
+	postfx.set_anchors_preset(Control.PRESET_FULL_RECT)
+	postfx.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sm = ShaderMaterial.new()
+	sm.shader = load("res://postfx.gdshader")
+	postfx.material = sm
+	layer.add_child(postfx)
+
+func make_audio():
+	hum = AudioStreamPlayer.new()
+	var gen = AudioStreamGenerator.new()
+	gen.mix_rate = 22050
+	gen.buffer_length = 0.2
+	hum.stream = gen
+	hum.volume_db = -26.0
+	add_child(hum)
+	hum.play()
+	hum_pb = hum.get_stream_playback()
+	beat = AudioStreamPlayer.new()
+	beat.stream = make_beat()
+	beat.volume_db = -2.0
+	add_child(beat)
+	phantom = AudioStreamPlayer3D.new()
+	phantom.stream = load("res://sounds/monsterStep.ogg")
+	phantom.unit_size = 8
+	phantom.max_distance = 40
+	add_child(phantom)
+
+func make_beat():
+	var rate = 22050
+	var n = int(rate * 0.45)
+	var data = PackedByteArray()
+	data.resize(n * 2)
+	for i in n:
+		var t = float(i) / rate
+		var v = 0.0
+		if t < 0.15:
+			v += sin(TAU * 62.0 * t) * exp(-t * 28.0) + 0.3 * sin(TAU * 124.0 * t) * exp(-t * 40.0)
+		var t2 = t - 0.22
+		if t2 > 0.0 and t2 < 0.15:
+			v += 0.7 * (sin(TAU * 56.0 * t2) * exp(-t2 * 28.0) + 0.3 * sin(TAU * 112.0 * t2) * exp(-t2 * 40.0))
+		data.encode_s16(i * 2, int(clampf(v, -1.0, 1.0) * 30000))
+	var w = AudioStreamWAV.new()
+	w.format = AudioStreamWAV.FORMAT_16_BITS
+	w.mix_rate = rate
+	w.data = data
+	return w
 
 func make_hud():
 	var layer = CanvasLayer.new()
@@ -59,7 +146,21 @@ func make_hud():
 	hud = Label.new()
 	hud.position = Vector2(20, 44)
 	hud.add_theme_font_size_override("font_size", 22)
+	hud.add_theme_color_override("font_color", Color(0.86, 0.82, 0.66))
+	hud.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	hud.add_theme_constant_override("shadow_offset_x", 2)
+	hud.add_theme_constant_override("shadow_offset_y", 2)
 	layer.add_child(hud)
+	if not player.touch:
+		var hint = Label.new()
+		hint.text = "WASD move    Shift run    F flashlight    Esc free mouse"
+		hint.add_theme_font_size_override("font_size", 18)
+		hint.add_theme_color_override("font_color", Color(0.86, 0.82, 0.66, 0.8))
+		hint.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+		hint.offset_left = 20
+		hint.offset_top = -44
+		layer.add_child(hint)
+		create_tween().tween_property(hint, "modulate:a", 0.0, 2.0).set_delay(8.0)
 	var b = Button.new()
 	b.text = "Menu"
 	b.set_anchors_preset(Control.PRESET_TOP_RIGHT)
@@ -168,23 +269,135 @@ func load_chunk(c):
 	mmi.material_override = wall_mat
 	root.add_child(mmi)
 
+	var tm = MultiMesh.new()
+	tm.transform_format = MultiMesh.TRANSFORM_3D
+	tm.mesh = unit_box
+	tm.instance_count = runs.size()
+	for i in runs.size():
+		var r = runs[i]
+		var sz = Vector3(r[1].x + 0.06, 0.14, r[1].z + 0.06)
+		tm.set_instance_transform(i, Transform3D(Basis.from_scale(sz), Vector3(r[0].x, 0.07, r[0].z)))
+	var tmi = MultiMeshInstance3D.new()
+	tmi.multimesh = tm
+	tmi.material_override = trim_mat
+	root.add_child(tmi)
+
 	var list = []
 	var rng = RandomNumberGenerator.new()
 	rng.seed = hash(Vector3i(c.x, c.y, world_seed))
-	var count = 5 if hall else 3
-	for i in count:
-		for t in 30:
-			var x = c.x * CS + rng.randi_range(0, CS - 1)
-			var y = c.y * CS + rng.randi_range(0, CS - 1)
+	for ly in range(1, CS, 4):
+		for lx in range(1, CS, 4):
+			var x = c.x * CS + lx
+			var y = c.y * CS + ly
 			if not is_wall(x, y):
-				var l = OmniLight3D.new()
-				l.position = Vector3(x * TILE, 2.7, y * TILE)
-				l.omni_range = 14 if hall else 10
-				l.light_color = Color("fff3b0")
-				root.add_child(l)
-				list.append(l)
-				break
+				list.append(make_fixture(root, Vector3(x * TILE, 0, y * TILE), hall, rng))
 	chunks[c] = {"root": root, "lights": list}
+
+func make_fixture(root, p, hall, rng):
+	var roll = rng.randf()
+	var kind = 0
+	if roll < 0.15:
+		kind = 2
+	elif roll < 0.35:
+		kind = 1
+	var m = StandardMaterial3D.new()
+	m.albedo_color = Color(0.85, 0.85, 0.8)
+	m.emission_enabled = true
+	m.emission = Color("fff4d2")
+	m.emission_energy_multiplier = 0.0 if kind == 2 else 4.0
+	var mi = MeshInstance3D.new()
+	mi.mesh = fixture_box
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = Vector3(p.x, H - 0.02, p.z)
+	root.add_child(mi)
+	var f = {"m": m, "kind": kind, "t": 0.0, "on": true, "l": null}
+	if kind != 2:
+		var l = OmniLight3D.new()
+		l.position = Vector3(p.x, H - 0.3, p.z)
+		l.omni_range = 16 if hall else 13
+		l.omni_attenuation = 1.0
+		l.light_energy = 2.2
+		l.light_color = Color("fff1c4")
+		root.add_child(l)
+		f["l"] = l
+	return f
+
+func update_lights(delta):
+	var mp = monster.global_position
+	var p = player.global_position
+	shadow_timer -= delta
+	var recheck = shadow_timer <= 0
+	if recheck:
+		shadow_timer = 0.3
+	for c in chunks:
+		for f in chunks[c]["lights"]:
+			var l = f["l"]
+			if l == null:
+				continue
+			if recheck:
+				l.shadow_enabled = Game.high_gfx and l.global_position.distance_to(p) < 16.0
+			var e = 1.0
+			f["t"] -= delta
+			if f["kind"] == 1:
+				if f["t"] <= 0:
+					f["on"] = not f["on"]
+					f["t"] = randf_range(0.05, 3.0) if f["on"] else randf_range(0.02, 0.25)
+				if not f["on"]:
+					e = randf_range(0.0, 0.15)
+			elif randf() < 0.002:
+				e = randf_range(0.3, 0.7)
+			var dm = l.global_position.distance_to(mp)
+			if dm < 10.0:
+				var k = dm / 10.0
+				e *= lerpf(0.05, 1.0, k * k)
+				if randf() < 0.2 * (1.0 - k):
+					e = 0.0
+			l.light_energy = e * 2.2
+			f["m"].emission_energy_multiplier = e * 4.0
+
+func fill_hum():
+	var n = hum_pb.get_frames_available()
+	for i in n:
+		hum_phase += 120.0 / 22050.0
+		var a = hum_phase * TAU
+		var s = sin(a) * 0.5 + sin(a * 2.0) * 0.25 + sin(a * 3.0) * 0.1 + randf_range(-0.04, 0.04)
+		hum_pb.push_frame(Vector2(s, s))
+	hum_phase = fmod(hum_phase, 1.0)
+
+func update_phantom(delta):
+	if phantom_steps > 0:
+		phantom_step_t -= delta
+		if phantom_step_t <= 0:
+			phantom_steps -= 1
+			phantom_step_t = 0.55
+			phantom.pitch_scale = randf_range(0.55, 0.7)
+			phantom.play()
+		return
+	phantom_timer -= delta
+	if phantom_timer <= 0 and monster.state == monster.WANDER:
+		phantom_timer = randf_range(25.0, 60.0)
+		var a = randf() * TAU
+		phantom.position = player.position + Vector3(cos(a), 0, sin(a)) * randf_range(14.0, 22.0)
+		phantom_steps = randi_range(3, 6)
+
+func update_fear(delta):
+	var d = monster.global_position.distance_to(player.global_position)
+	var target = 0.0
+	if dead:
+		target = 1.0
+	elif monster.state == monster.CHASE:
+		target = 0.55 + 0.45 * clampf(1.0 - d / 20.0, 0.0, 1.0)
+	elif monster.state == monster.PEEK:
+		target = 0.35
+	elif d < 15.0:
+		target = 0.25 * (1.0 - d / 15.0)
+	fear = move_toward(fear, target, delta * 0.8)
+	postfx.material.set_shader_parameter("fear", fear)
+	beat_timer -= delta
+	if fear > 0.2 and beat_timer <= 0 and not dead:
+		beat.play()
+		beat_timer = lerpf(1.1, 0.38, fear)
 
 func _process(delta):
 	if not dead:
@@ -204,12 +417,10 @@ func _process(delta):
 			if not loaded and not chunks.has(c):
 				load_chunk(c)
 				loaded = true
-	for c in chunks:
-		for l in chunks[c]["lights"]:
-			if randf() < 0.03:
-				l.light_energy = randf_range(0.0, 0.6)
-			else:
-				l.light_energy = 1.0
+	update_lights(delta)
+	fill_hum()
+	update_phantom(delta)
+	update_fear(delta)
 
 	var pd = Vector2(p.x - pickup.position.x, p.z - pickup.position.z).length()
 	if pd < 1.5 and not dead:
